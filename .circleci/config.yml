@@ -1,0 +1,47 @@
+version: 2.1
+
+orbs:
+  codecov: codecov/codecov@5
+
+jobs:
+  build-and-test:
+    docker:
+      - image: cimg/openjdk:17.0
+    steps:
+      - checkout
+
+      - restore_cache:
+          keys:
+            - v1-maven-{{ checksum "pom.xml" }}
+            - v1-maven-
+
+      - run:
+          name: Build
+          command: mvn -B -DskipTests clean compile
+
+      - save_cache:
+          paths:
+            - ~/.m2/repository
+          key: v1-maven-{{ checksum "pom.xml" }}
+
+      - run:
+          name: Testes
+          command: mvn -B test
+
+      - run:
+          name: Relatório de cobertura (JaCoCo)
+          command: mvn -B verify
+
+      - store_test_results:
+          path: target/surefire-reports
+
+      - store_artifacts:
+          path: target/site/jacoco
+
+      - codecov/upload:
+          files: target/site/jacoco/jacoco.xml
+
+workflows:
+  ci:
+    jobs:
+      - build-and-test

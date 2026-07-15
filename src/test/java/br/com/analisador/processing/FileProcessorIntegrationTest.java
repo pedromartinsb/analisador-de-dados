@@ -3,9 +3,11 @@ package br.com.analisador.processing;
 import static br.com.analisador.TestFixtures.EXEMPLO_DO_ENUNCIADO;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
+import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -120,5 +122,25 @@ class FileProcessorIntegrationTest {
         FileProcessor processor = newProcessor(tempDir);
 
         assertDoesNotThrow(() -> processor.process(arquivoInexistente));
+    }
+
+    @Test
+    void deveProcessarOArquivoDeExemploDeSrcTestResources(@TempDir Path outputDir) throws Exception {
+        // Lê o .dat exigido pela estrutura do repositório (src/test/resources/
+        // dados-teste.dat) via classpath, em vez de escrevê-lo num @TempDir —
+        // prova que o arquivo entregue é usado de verdade, não decorativo.
+        URL resource = getClass().getClassLoader().getResource("dados-teste.dat");
+        assertNotNull(resource, "dados-teste.dat precisa estar em src/test/resources");
+        Path inputFile = Path.of(resource.toURI());
+
+        FileProcessor processor = newProcessor(outputDir);
+        processor.process(inputFile);
+
+        String relatorio = Files.readString(outputDir.resolve("dados-teste.done.dat"), StandardCharsets.UTF_8);
+        String expected = "Quantidade de clientes: 2\n"
+                + "Quantidade de vendedores: 2\n"
+                + "ID da venda mais cara: 10\n"
+                + "Pior vendedor (menor volume de vendas): Paulo\n";
+        assertEquals(expected, relatorio);
     }
 }

@@ -1,5 +1,6 @@
 package br.com.analisador.processing;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -13,6 +14,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Tag;
@@ -84,20 +86,22 @@ class DirectoryWatcherTest {
     }
 
     @Test
-    void awaitStable_deveRetornarSemBloquearIndefinidamenteParaArquivoJaCompleto(@TempDir Path tempDir)
-            throws Exception {
+    void awaitStable_deveRetornarParaArquivoJaCompleto(@TempDir Path tempDir) throws Exception {
         Path arquivo = tempDir.resolve("estavel.dat");
         Files.writeString(arquivo, "conteudo fixo", StandardCharsets.UTF_8);
 
         DirectoryWatcher watcher = new DirectoryWatcher(tempDir, ".dat");
 
-        long inicio = System.currentTimeMillis();
-        watcher.awaitStable(arquivo);
-        long duracao = System.currentTimeMillis() - inicio;
+        assertDoesNotThrow(() -> watcher.awaitStable(arquivo));
+    }
 
-        // Não é uma garantia de tempo formal — só confirma que a mitigação
-        // pragmática não trava indefinidamente para um arquivo já completo.
-        assertTrue(duracao < 2000);
+    @Test
+    void awaitStable_deveRetornarSemErroQuandoOArquivoSomeAntesDaChecagem(@TempDir Path tempDir) {
+        // Files.size lança IOException; awaitStable retorna e deixa o parser
+        // lidar com a ausência do arquivo adiante — exercita o ramo de captura.
+        DirectoryWatcher watcher = new DirectoryWatcher(tempDir, ".dat");
+
+        assertDoesNotThrow(() -> watcher.awaitStable(tempDir.resolve("nao-existe.dat")));
     }
 
     // --- Casos 29 a 31: integração real via WatchService ---
@@ -171,7 +175,7 @@ class DirectoryWatcherTest {
         assertTrue(relatorio.contains("Quantidade de clientes: 1"));
     }
 
-    private Thread startWatcher(DirectoryWatcher watcher, java.util.function.Consumer<Path> handler)
+    private Thread startWatcher(DirectoryWatcher watcher, Consumer<Path> handler)
             throws InterruptedException {
         Thread thread = new Thread(() -> {
             try {

@@ -3,7 +3,9 @@ package br.com.analisador.analysis;
 import java.math.BigDecimal;
 import java.util.Comparator;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -55,11 +57,34 @@ public class SalesAnalyzer {
                 .max(Comparator.comparing(Sale::total))
                 .map(Sale::id);
 
-        Optional<String> worstSellerName = sellers.stream()
-                .min(Comparator.comparing(seller -> revenueOf(seller, validSales)))
-                .map(Seller::name);
+        return new AnalysisResult(clients.size(), sellers.size(),
+                mostExpensiveSaleId, worstSellerName(sellers, validSales));
+    }
 
-        return new AnalysisResult(clients.size(), sellers.size(), mostExpensiveSaleId, worstSellerName);
+    /**
+     * Faturamento por vendedor em uma única passagem sobre as vendas.
+     *
+     * <p>O mapa é semeado a partir da lista de {@link Seller} antes de
+     * qualquer venda ser somada — é isso que faz o vendedor sem nenhuma
+     * venda aparecer com faturamento zero e concorrer a pior vendedor
+     * (D14). Um agrupamento sobre as vendas nunca o veria.
+     *
+     * <p>{@link LinkedHashMap} preserva a ordem de inserção, que é a ordem
+     * dos registros 001 no arquivo; combinada com a estabilidade de
+     * {@link java.util.stream.Stream#min}, garante o desempate por primeira
+     * ocorrência (D12).
+     */
+    private Optional<String> worstSellerName(List<Seller> sellers, List<Sale> sales) {
+        Map<String, BigDecimal> revenueBySeller = new LinkedHashMap<>();
+        for (Seller seller : sellers) {
+            revenueBySeller.putIfAbsent(seller.name(), BigDecimal.ZERO);
+        }
+        for (Sale sale : sales) {
+            revenueBySeller.merge(sale.sellerName(), sale.total(), BigDecimal::add);
+        }
+        return revenueBySeller.entrySet().stream()
+                .min(Map.Entry.comparingByValue())
+                .map(Map.Entry::getKey);
     }
 
     private List<Sale> discardSalesWithUnknownSeller(List<Sale> sales, List<Seller> sellers) {
@@ -78,13 +103,6 @@ public class SalesAnalyzer {
                     return known;
                 })
                 .toList();
-    }
-
-    private BigDecimal revenueOf(Seller seller, List<Sale> sales) {
-        return sales.stream()
-                .filter(sale -> sale.sellerName().equals(seller.name()))
-                .map(Sale::total)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
     private <T> List<T> distinctByKey(List<T> items, Function<T, String> keyExtractor) {

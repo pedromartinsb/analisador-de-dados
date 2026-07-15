@@ -1,5 +1,6 @@
 package br.com.analisador.parser;
 
+import static br.com.analisador.TestFixtures.EXEMPLO_DO_ENUNCIADO;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.io.IOException;
@@ -17,15 +18,6 @@ class FileParserTest {
 
     private final FileParser fileParser = new FileParser(
             new LineParser(List.of(new SellerParser(), new ClientParser(), new SaleParser())));
-
-    private static final String EXEMPLO_DO_ENUNCIADO = """
-            001ç1234567891234çPedroç50000
-            001ç3245678865434çPauloç40000.99
-            002ç2345675434544345çJose da SilvaçRural
-            002ç2345675433444345çEduardo PereiraçRural
-            003ç10ç[1-10-100,2-30-2.50,3-40-3.10]çPedro
-            003ç08ç[1-34-10,2-33-1.50,3-40-0.10]çPaulo
-            """;
 
     @Test
     void deveParsearOArquivoDeExemploDoEnunciadoPorCompleto(@TempDir Path tempDir) throws IOException {

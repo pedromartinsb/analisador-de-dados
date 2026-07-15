@@ -1,7 +1,7 @@
 # Analisador de Dados
 
-[![CircleCI](https://dl.circleci.com/status-badge/img/gh/pedrombcampos/analisador-de-dados/tree/main.svg?style=svg)](https://dl.circleci.com/status-badge/redirect/gh/pedrombcampos/analisador-de-dados/tree/main)
-[![codecov](https://codecov.io/gh/pedrombcampos/analisador-de-dados/branch/main/graph/badge.svg)](https://codecov.io/gh/pedrombcampos/analisador-de-dados)
+[![CircleCI](https://dl.circleci.com/status-badge/img/gh/pedromartinsb/analisador-de-dados/tree/main.svg?style=svg)](https://dl.circleci.com/status-badge/redirect/gh/pedromartinsb/analisador-de-dados/tree/main)
+[![codecov](https://codecov.io/gh/pedromartinsb/analisador-de-dados/branch/main/graph/badge.svg)](https://codecov.io/gh/pedromartinsb/analisador-de-dados)
 
 Sistema de análise de dados que monitora um diretório de entrada, processa
 arquivos `.dat` em lote e gera relatórios automaticamente.

@@ -1,132 +1,101 @@
 package br.com.analisador.processing;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
+import java.util.Optional;
 
-import org.junit.jupiter.api.Tag;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InOrder;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 
+import br.com.analisador.analysis.AnalysisResult;
 import br.com.analisador.analysis.SalesAnalyzer;
-import br.com.analisador.parser.ClientParser;
+import br.com.analisador.domain.ParsedData;
 import br.com.analisador.parser.FileParser;
-import br.com.analisador.parser.LineParser;
-import br.com.analisador.parser.SaleParser;
-import br.com.analisador.parser.SellerParser;
-import br.com.analisador.report.ReportFormatter;
 import br.com.analisador.report.ReportWriter;
 
 /**
- * Testes de integração do pipeline completo, sem mocks dos componentes
- * internos (D10): FileParser, SalesAnalyzer e ReportWriter reais,
- * exercitados de ponta a ponta a partir de arquivos em {@code @TempDir}.
+ * Testes de orquestração do {@link FileProcessor} com colaboradores
+ * mockados. Complementa {@link FileProcessorIntegrationTest}, que exercita
+ * o pipeline real: aqui o alvo é o contrato entre as camadas (ordem das
+ * chamadas, o que é repassado ao writer) e a fronteira de contenção diante
+ * de falhas que a integração não consegue forçar.
  */
-@Tag("integration")
+@ExtendWith(MockitoExtension.class)
 class FileProcessorTest {
 
-    private static final String EXEMPLO_DO_ENUNCIADO = """
-            001ç1234567891234çPedroç50000
-            001ç3245678865434çPauloç40000.99
-            002ç2345675434544345çJose da SilvaçRural
-            002ç2345675433444345çEduardo PereiraçRural
-            003ç10ç[1-10-100,2-30-2.50,3-40-3.10]çPedro
-            003ç08ç[1-34-10,2-33-1.50,3-40-0.10]çPaulo
-            """;
+    private static final Path ARQUIVO = Path.of("/tmp/entrada/dados.dat");
 
-    private FileProcessor newProcessor(Path outputDirectory) {
-        FileParser fileParser = new FileParser(
-                new LineParser(List.of(new SellerParser(), new ClientParser(), new SaleParser())));
-        return new FileProcessor(
-                fileParser, new SalesAnalyzer(), new ReportWriter(outputDirectory, new ReportFormatter()));
+    @Mock
+    private FileParser parser;
+
+    @Mock
+    private SalesAnalyzer analyzer;
+
+    @Mock
+    private ReportWriter writer;
+
+    private FileProcessor processor;
+
+    private final ParsedData parsed = new ParsedData(List.of());
+    private final AnalysisResult result =
+            new AnalysisResult(0, 0, Optional.empty(), Optional.empty());
+
+    @BeforeEach
+    void setUp() {
+        processor = new FileProcessor(parser, analyzer, writer);
     }
 
     @Test
-    void caso26_devePipelineCompletoGerarRelatorioComOOraculoDoEnunciado(@TempDir Path tempDir) throws IOException {
-        Path inputFile = tempDir.resolve("exemplo.dat");
-        Files.writeString(inputFile, EXEMPLO_DO_ENUNCIADO, StandardCharsets.UTF_8);
+    void deveExecutarOPipelineNaOrdemParserAnalyzerWriter() throws IOException {
+        when(parser.parse(ARQUIVO)).thenReturn(parsed);
+        when(analyzer.analyze(parsed)).thenReturn(result);
 
-        FileProcessor processor = newProcessor(tempDir);
-        processor.process(inputFile);
+        processor.process(ARQUIVO);
 
-        Path outputFile = tempDir.resolve("exemplo.done.dat");
-        assertTrue(Files.exists(outputFile));
-
-        String expected = "Quantidade de clientes: 2\n"
-                + "Quantidade de vendedores: 2\n"
-                + "ID da venda mais cara: 10\n"
-                + "Pior vendedor (menor volume de vendas): Paulo\n";
-        assertEquals(expected, Files.readString(outputFile, StandardCharsets.UTF_8));
+        InOrder inOrder = inOrder(parser, analyzer, writer);
+        inOrder.verify(parser).parse(ARQUIVO);
+        inOrder.verify(analyzer).analyze(parsed);
+        // O writer recebe o nome do arquivo, não o caminho completo.
+        inOrder.verify(writer).write("dados.dat", result);
     }
 
     @Test
-    void caso27_deveIgnorarLinhasInvalidasSemInterromperOProcessamento(@TempDir Path tempDir) throws IOException {
-        String conteudo = """
-                001ç1234567891234çPedroç50000
-                001ç123çLinhaMalformada
-                002ç2345675434544345çJose da SilvaçRural
-                003ç10ç[1-10-100]çPedro
-                003ç99ç[item-invalido]çPedro
-                """;
-        Path inputFile = tempDir.resolve("com-erros.dat");
-        Files.writeString(inputFile, conteudo, StandardCharsets.UTF_8);
+    void naoDevePropagarNemChamarAsCamadasSeguintesQuandoOParserFalha() throws IOException {
+        when(parser.parse(ARQUIVO)).thenThrow(new IOException("arquivo ilegível"));
 
-        FileProcessor processor = newProcessor(tempDir);
+        assertDoesNotThrow(() -> processor.process(ARQUIVO));
 
-        assertDoesNotThrow(() -> processor.process(inputFile));
-
-        Path outputFile = tempDir.resolve("com-erros.done.dat");
-        assertTrue(Files.exists(outputFile));
-
-        // Sobrevivem: 1 vendedor (Pedro), 1 cliente (Jose da Silva) e a
-        // venda "10" (a venda "99" é descartada por item malformado).
-        String expected = "Quantidade de clientes: 1\n"
-                + "Quantidade de vendedores: 1\n"
-                + "ID da venda mais cara: 10\n"
-                + "Pior vendedor (menor volume de vendas): Pedro\n";
-        assertEquals(expected, Files.readString(outputFile, StandardCharsets.UTF_8));
+        verifyNoInteractions(analyzer, writer);
     }
 
     @Test
-    void caso28_deveProcessarMultiplosArquivosViaExecutorServiceGerandoUmRelatorioCada(@TempDir Path tempDir)
-            throws IOException, InterruptedException {
-        Path arquivo1 = tempDir.resolve("vendas-norte.dat");
-        Files.writeString(arquivo1, "001ç1çAnaç1000\n003ç1ç[1-1-100]çAna\n", StandardCharsets.UTF_8);
+    void naoDevePropagarNemEscreverRelatorioQuandoOAnalyzerFalha() throws IOException {
+        when(parser.parse(ARQUIVO)).thenReturn(parsed);
+        when(analyzer.analyze(parsed)).thenThrow(new IllegalStateException("falha simulada"));
 
-        Path arquivo2 = tempDir.resolve("vendas-sul.dat");
-        Files.writeString(arquivo2, "001ç2çBrunoç1000\n003ç2ç[1-1-200]çBruno\n", StandardCharsets.UTF_8);
+        assertDoesNotThrow(() -> processor.process(ARQUIVO));
 
-        FileProcessor processor = newProcessor(tempDir);
-
-        ExecutorService executor = Executors.newFixedThreadPool(2);
-        executor.submit(() -> processor.process(arquivo1));
-        executor.submit(() -> processor.process(arquivo2));
-        executor.shutdown();
-        assertTrue(executor.awaitTermination(5, TimeUnit.SECONDS));
-
-        String relatorio1 = Files.readString(tempDir.resolve("vendas-norte.done.dat"), StandardCharsets.UTF_8);
-        String relatorio2 = Files.readString(tempDir.resolve("vendas-sul.done.dat"), StandardCharsets.UTF_8);
-
-        assertTrue(relatorio1.contains("ID da venda mais cara: 1"));
-        assertTrue(relatorio1.contains("Pior vendedor (menor volume de vendas): Ana"));
-        assertTrue(relatorio2.contains("ID da venda mais cara: 2"));
-        assertTrue(relatorio2.contains("Pior vendedor (menor volume de vendas): Bruno"));
+        verifyNoInteractions(writer);
     }
 
     @Test
-    void deveConterFalhaDeIOSemPropagarQuandoArquivoNaoExiste(@TempDir Path tempDir) {
-        Path arquivoInexistente = tempDir.resolve("nao-existe.dat");
-        FileProcessor processor = newProcessor(tempDir);
+    void naoDevePropagarQuandoAEscritaDoRelatorioFalha() throws IOException {
+        when(parser.parse(ARQUIVO)).thenReturn(parsed);
+        when(analyzer.analyze(parsed)).thenReturn(result);
+        doThrow(new IOException("disco cheio")).when(writer).write(any(), any());
 
-        assertDoesNotThrow(() -> processor.process(arquivoInexistente));
+        assertDoesNotThrow(() -> processor.process(ARQUIVO));
     }
 }

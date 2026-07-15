@@ -13,7 +13,7 @@
         <maven.compiler.release>17</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <junit.version>5.10.2</junit.version>
-        <mockito.version>5.11.0</mockito.version>
+        <mockito.version>5.23.0</mockito.version>
         <jacoco.version>0.8.12</jacoco.version>
         <surefire.version>3.2.5</surefire.version>
         <logback.version>1.5.6</logback.version>
@@ -47,19 +47,24 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>${surefire.version}</version>
+                <configuration>
+                    <!--
+                        @{argLine} é o placeholder que o jacoco:prepare-agent injeta
+                        (-javaagent:...). Omiti-lo aqui quebraria a cobertura em
+                        silêncio, sem erro visível — já vimos esse modo de falha
+                        antes. O flag do Byte Buddy é rede de segurança para
+                        runtimes de JDK mais novos que a versão oficialmente
+                        suportada pela versão do Mockito em uso; documentado pelo
+                        próprio projeto Byte Buddy.
+                    -->
+                    <argLine>@{argLine} -Dnet.bytebuddy.experimental=true</argLine>
+                </configuration>
             </plugin>
 
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-jar-plugin</artifactId>
                 <version>3.4.1</version>
-                <configuration>
-                    <archive>
-                        <manifest>
-                            <mainClass>${main.class}</mainClass>
-                        </manifest>
-                    </archive>
-                </configuration>
             </plugin>
 
             <plugin>

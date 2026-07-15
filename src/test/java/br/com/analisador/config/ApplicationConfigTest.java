@@ -35,4 +35,16 @@ class ApplicationConfigTest {
         assertEquals(".dat", config.fileExtension());
         assertEquals(4, config.workerThreads());
     }
+
+    @Test
+    void deveFalharQuandoResourceNaoExiste() {
+        assertThrows(IllegalStateException.class, () -> ApplicationConfig.load("/inexistente.properties"));
+    }
+
+    @Test
+    void deveFalharQuandoPropriedadeEmBranco() {
+        Properties props = new Properties();
+        props.setProperty("directory.in", "   ");
+        assertThrows(IllegalStateException.class, () -> ApplicationConfig.of(props).inputDirectory());
+    }
 }

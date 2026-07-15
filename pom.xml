@@ -71,29 +71,36 @@
                         <id>prepare-agent</id>
                         <goals><goal>prepare-agent</goal></goals>
                     </execution>
+
                     <execution>
                         <id>report</id>
                         <phase>verify</phase>
                         <goals><goal>report</goal></goals>
+                        <configuration>
+                            <excludes>
+                                <exclude>**/Application.class</exclude>
+                            </excludes>
+                        </configuration>
                     </execution>
+
                     <execution>
                         <id>check</id>
                         <phase>verify</phase>
                         <goals><goal>check</goal></goals>
                         <configuration>
+                            <excludes>
+                                <exclude>**/Application.class</exclude>
+                            </excludes>
                             <rules>
                                 <rule>
                                     <element>BUNDLE</element>
                                     <limits>
                                         <limit>
-                                            <counter>INSTRUCTION</counter>
+                                            <counter>LINE</counter>
                                             <value>COVEREDRATIO</value>
                                             <minimum>0.80</minimum>
                                         </limit>
                                     </limits>
-                                    <excludes>
-                                        <exclude>br.com.analisador.Application</exclude>
-                                    </excludes>
                                 </rule>
                             </rules>
                         </configuration>

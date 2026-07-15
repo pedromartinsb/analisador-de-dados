@@ -22,15 +22,19 @@ public final class ApplicationConfig {
     }
 
     public static ApplicationConfig load() {
-        try (InputStream in = ApplicationConfig.class.getResourceAsStream(RESOURCE)) {
+        return load(RESOURCE);
+    }
+
+    static ApplicationConfig load(String resource) {
+        try (InputStream in = ApplicationConfig.class.getResourceAsStream(resource)) {
             if (in == null) {
-                throw new IllegalStateException("Arquivo não encontrado: " + RESOURCE);
+                throw new IllegalStateException("Arquivo não encontrado: " + resource);
             }
             Properties props = new Properties();
             props.load(new InputStreamReader(in, StandardCharsets.UTF_8));
             return new ApplicationConfig(props);
         } catch (IOException e) {
-            throw new IllegalStateException("Falha ao carregar " + RESOURCE, e);
+            throw new IllegalStateException("Falha ao carregar " + resource, e);
         }
     }
 

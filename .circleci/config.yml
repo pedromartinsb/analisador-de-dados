@@ -1,8 +1,5 @@
 version: 2.1
 
-orbs:
-  codecov: codecov/codecov@5
-
 jobs:
   build-and-test:
     docker:
@@ -38,8 +35,18 @@ jobs:
       - store_artifacts:
           path: target/site/jacoco
 
-      - codecov/upload:
-          files: target/site/jacoco/jacoco.xml
+      - run:
+          name: Envio do relatório ao Codecov
+          command: |
+            curl -Os https://cli.codecov.io/latest/linux/codecov
+            curl -Os https://cli.codecov.io/latest/linux/codecov.SHA256SUM
+            sha256sum -c codecov.SHA256SUM
+            chmod +x codecov
+            ./codecov upload-process \
+              --disable-search \
+              --file target/site/jacoco/jacoco.xml \
+              --token "${CODECOV_TOKEN}" \
+              --fail-on-error
 
 workflows:
   ci:

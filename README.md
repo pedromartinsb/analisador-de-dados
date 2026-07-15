@@ -37,6 +37,12 @@ mvn test          # testes unitários e de integração
 mvn verify         # testes + cobertura (JaCoCo) + gate de 80%
 ```
 
+`src/test/resources/dados-teste.dat` é o arquivo de exemplo do enunciado,
+idêntico ao publicado no PDF. Não é decorativo: é lido via classpath em
+`FileProcessorIntegrationTest.deveProcessarOArquivoDeExemploDeSrcTestResources`,
+que exercita o pipeline completo sobre ele e confere a saída contra o
+oráculo do enunciado.
+
 Testes de integração (`@Tag("integration")`) usam `@TempDir` e, no caso do
 `DirectoryWatcher`, o `WatchService` real do sistema de arquivos — não são
 instantâneos por natureza (a suíte completa leva alguns segundos, não
